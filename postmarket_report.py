@@ -3,7 +3,7 @@
 GitHub Actions-ready postmarket email agent (free runner)
 Key points:
 - Reads secrets from ENV (GITHUB Actions secrets)
-- Guards to only run at 17:00 US/Eastern on weekdays
+- Guards to only run at 18:30 US/Eastern on weekdays
 - Pulls S&P500 tickers from slickcharts
 - Scans movers (pre/post market) using yfinance (limited to top N to reduce time)
 - Generates Traditional Chinese report via Gemini
