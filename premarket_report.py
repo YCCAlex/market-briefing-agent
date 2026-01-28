@@ -414,6 +414,7 @@ HTML 使用規範：
 不得在句子中插入 HTML 標籤
 
 結構與格式要求（必須完全一致，不可調整順序或名稱）：
+<h1>{now_est().strftime('%Y-%m-%d')} 美股盤前市場報告"</h1>
 <h2>🗓️今日預計公布財報公司</h2>
 公司英文全部名稱 + (Ticker)<br>
 公司英文全部名稱 + (Ticker)<br>
@@ -510,7 +511,7 @@ HTML 使用規範：
 # =======================
 def send_email(body: str) -> bool:
     try:
-        subject_text = f"【美股盤前日報】{now_est().strftime('%Y-%m-%d')} 市場預警"
+        subject_text = f"【美股盤前日報】{now_est().strftime('%Y-%m-%d')} 市場報告"
 
         msg = EmailMessage(policy=policy.SMTP)
         msg["Subject"] = subject_text
