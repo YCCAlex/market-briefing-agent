@@ -223,6 +223,47 @@ def safe_last_price_1m(hist: pd.DataFrame) -> float:
         return 0.0
 
 
+def compute_postmarket_move_from_hist(hist: pd.DataFrame, now_et: datetime) -> Tuple[float, float, float]:
+    """
+    Returns (close_4pm, post_last, post_move_pct)
+
+    close_4pm: today's regular-session close (last bar in 09:30–16:00 ET)
+    post_last: last traded price in post-market up to now_et (16:01–20:00 ET)
+    post_move_pct: % change from close_4pm to post_last
+    """
+    if hist is None or hist.empty:
+        raise ValueError("empty hist")
+
+    h = hist.copy()
+
+    # Ensure timezone-aware, then convert to ET
+    if getattr(h.index, "tz", None) is None:
+        h.index = h.index.tz_localize("UTC")
+    h = h.tz_convert("America/New_York")
+
+    # Regular session close (baseline)
+    reg = h.between_time("09:30", "16:00")
+    if reg.empty:
+        raise ValueError("no regular session bars")
+    close_4pm = float(reg["Close"].iloc[-1])
+
+    # Post-market (avoid 16:00 close-auction noise)
+    post = h.between_time("16:01", "20:00")
+    post = post[post.index <= now_et]
+
+    # Optional: filter out zero-volume prints (safer)
+    if "Volume" in post.columns:
+        post = post[post["Volume"] > 0]
+
+    if post.empty:
+        return close_4pm, close_4pm, 0.0
+
+    post_last = float(post["Close"].iloc[-1])
+    post_move_pct = ((post_last / close_4pm) - 1.0) * 100.0
+
+    return close_4pm, post_last, post_move_pct
+
+
 def fetch_movers(
     tickers: List[str],
     top_set: set,
@@ -256,15 +297,9 @@ def fetch_movers(
             if hist is None or hist.empty:
                 continue
 
-            prev_close = safe_prev_close(tk)
-            if not prev_close:
-                continue
+            # Real post-market move vs today's 4pm close
+            close_4pm, post_last, change = compute_postmarket_move_from_hist(hist, now_est())
 
-            current_price = safe_last_price_1m(hist)
-            if not current_price:
-                continue
-
-            change = ((current_price - prev_close) / prev_close) * 100.0
             threshold = THRESHOLD_TOP if symbol in top_set else THRESHOLD_OTHERS
 
             if abs(change) < threshold:
@@ -282,9 +317,10 @@ def fetch_movers(
             item = {
                 "symbol": symbol,
                 "change": f"{change:.2f}%",
-                "price": round(current_price, 2),
+                "price": round(post_last, 2),     # post-market last price
+                "close": round(close_4pm, 2),     # today's 4pm close (debug/trace)
                 "threshold": f"{threshold:.0f}%",
-                "news": news_items, # title + url
+                "news": news_items,  # title + url
             }
 
             if change > 0 and len(winners) < 3:
